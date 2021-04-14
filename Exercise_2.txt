@@ -1,0 +1,165 @@
+Author : Mathieu Tardy
+
+Assignment 4 : MongoDB
+
+Description of the database:
+
+The database is a collection of tourist activities in Paris. There are five nested documents (contact, services, location, reviews and likes). We can find information on how to contact the tourist activity, the location of the activity (this document includes another nested document with the exact GPS coordinates of the activity), the reviews of the service which is composed of other nested documents with detail information about each reviews. Another nested document is the list of services they provide in an array. The link to the specific activity is made on the id of the activity.
+
+In the main collection, we also have the name of the service, the category, the description and the number of reviews made on this activity, which was extracted from the nested document reviews.
+
+QUERY 1: Retrieve one element of the collection.
+
+db.tourPedia_paris.find().limit(1)
+
+RESULTS: _id : 83419
+
+QUERY 2: Retrieve the name and the contact phone of any location for which the phone number is provided.
+
+db.tourPedia_paris.find(
+    { "contact.phone": { $ne: null } },
+    {name:1, "contact.phone":1}
+    )
+
+RESULTS: expected result.
+
+QUERY 3: Show the list of structures (just their name) that contain Paris in the name.
+
+db.tourPedia_paris.find(
+    {name:{$regex: "Paris"}},
+    {name:1}
+    )
+
+RESULTS: List of names of activity that contain Paris in their name.
+
+QUERY 4: Show the number of structures that are returned by the previous query.
+
+db.tourPedia_paris.find(
+    {name:{$regex: "Paris"} },
+    {name:1}
+    ).count()
+
+RESULTS : 1877
+
+QUERY 5: Provide the name of the structures that offer bagagerie among their services.
+
+db.tourPedia_paris.find(
+    {services: {$eq:"bagagerie"}},
+    {name:1}
+    )
+
+RESULTS: Expected result.
+
+QUERY 6: Give the list of structures that provide more than 10 services.
+
+db.tourPedia_paris.aggregate([
+    {$unwind : "$services" },
+    {$group: {_id: "$_id",total: {$sum: 1}}},
+    {$match: {total:{$gte:10}}}
+])
+
+RESULTS: List of id of activities with more than 10 services.
+
+QUERY 7: Give the list of structures that provide less than 3 services.
+
+db.tourPedia_paris.aggregate([
+    {$unwind : "$services" },
+    {$group: {_id: "$_id",total: {$sum: 1}}},
+    {$match: {total:{$lt:3}}}
+])
+
+RESULTS : Same as above with activities with less than 3 services.
+
+
+QUERY 8: Show the structure with the greater number of services.
+
+db.tourPedia_paris.aggregate(
+    [
+        {$unwind : "$services" },
+        {$group:{_id: "$_id",total:{$sum: 1}}},
+        {"$sort": {"total": -1}},
+        {"$limit":1}
+    ]
+)
+
+RESULTS : id of the acctivity with the most services is 215503
+
+QUERY 9: Give the list of structures that do not provide services.
+
+db.tourPedia_paris.aggregate(
+   [
+      {$project: {name: 1, services: { $ifNull: ["$services", []]}}},
+      {$project:{name:1, count:{$size:"$services"}}},
+      {$match: {count: {$eq: 0}}}    
+   ])
+
+RESULTS: All structures that do not provide services.
+
+QUERY 10: Comment about how these last structures are represented in the database.
+
+RESULTS: These last structures are represented as documents which contains the id of the activity and the total services it has.
+Services are either null or they are nested arrays. Sometimes there are 0 elements in these nested arrays.
+
+QUERY 11: Show the list of the names of the structures rated at least 3.
+
+QUERY 12: Give the number of locations having accommodation as category and that provide, among their services blanchisserie.
+
+db.tourPedia_paris.find({services: {$eq:"blanchisserie"}, category:"accommodation"}).count()
+
+RESULTS: 616
+
+QUERY 13: Give the number of reviews by source.
+
+db.tourPedia_paris.aggregate(
+   [
+       {$unwind:"$reviews"},
+       {$project:{reviews:"$reviews.source"}},
+       {$group:{_id:"$reviews", count:{$sum:1}}}
+   ]
+)
+
+RESULTS: Expected result.
+
+QUERY 14: Give the number of reviews by category and language.
+
+db.tourPedia_paris.aggregate(
+   [
+       {$unwind:"$reviews"},
+       {$project:{category:1,language:"$reviews.language"}},
+       {$group:{_id:{category:"$category",language:"$language"}, count:{$sum:1}}}
+   ]
+)
+
+RESULTS: Expected result.
+
+
+QUERY 15: Show the date (if any) in which the system received the most number of reviews.
+
+db.tourPedia_paris.aggregate(
+   [
+       {$unwind:"$reviews"},
+       {$project:{date:"$reviews.time"}},
+       {$group:{_id:"$date", count:{$sum:1}}},
+       {$sort:{"count":-1}},
+       {$limit:1}
+   ]
+)
+
+RESULTS: Expected result.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

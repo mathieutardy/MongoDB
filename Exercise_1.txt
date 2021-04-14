@@ -1,0 +1,182 @@
+Author: Mathieu Tardy
+
+Description of the database:
+There are two collections in the database called movielens_movies and movielens_users.
+
+movielens_users collects information about the user (id, name, gender, occupation). There is also a link to a nested document which lists all the rated movies of the associated user. This document holds the rating, the id of the movie and the timestamp at which the movie was rated.
+
+movielens_movies is a collection of movies. The available attributes are the id, the title and genres of the movie.
+
+We can make link between the two collections by joining on the id of the movies.
+
+
+QUERY 1: The number of users.
+
+db.movielens_users.distinct('_id').length
+
+RESULTS: 6040
+
+QUERY 2: The age of Anastasia Norbert.
+
+db.movielens_users.find({name:"Anastasia Norbert"},{age:1})
+
+RESULTS: 45
+
+QUERY 3: The occupation of Miquel Trent.
+
+db.movielens_users.find({name:"Miquel Trent"},{occupation:1})
+
+RESULTS: college/grad student
+
+QUERY 4: The number of users that are programmers.
+
+db.movielens_users.aggregate( [
+   { "$match": { "occupation": "programmer" } },
+   {
+     $group: {
+        _id: "$occupation",
+        count: { $sum: 1 }
+     }
+   }
+] )
+
+RESULTS: 388
+
+QUERY 5: The name of one of the oldest programmers.
+
+db.movielens_users.find(
+    {occupation: "programmer"},
+    {name:1}
+).sort( { age: -1 } ).limit(1)
+
+RESULTS: Malcolm Hans
+
+QUERY 6: How many programmers have the same age as the oldest programmer?
+
+db.movielens_users.find(
+    {occupation: "programmer", age:83},
+    {name:1,age:1}
+)
+
+RESULTS: No other, the closest oldest programmer is 82 years old.
+
+QUERY 7: How many females are programmers?
+
+db.movielens_users.find({occupation:"programmer",gender:"F"}).count()
+
+RESULTS: 50
+
+QUERY 8: How many users have evaluated more than one movie?
+
+db.movielens_users.aggregate([
+     {$project: {count: {$size: "$movies"}}},
+     {$match:{count:{$gte:2}}},
+     {$count:"count"}
+])
+
+RESULTS: 6040
+
+QUERY 9: How many movies do you have in the database?
+
+db.movielens_movies.count()
+
+RESULTS: 3883
+
+QUERY 10: Which is the movie that has 589 as id?
+
+db.movielens_movies.find({"_id":589},{title:1})
+
+RESULTS: Terminator 2: Judgment Day (1991)
+
+QUERY 11: The id of the movie The Untouchables
+
+db.movielens_movies.find({"title":{$regex: "Untouchables"} },{_id:1})
+
+RESULTS: 2194
+
+QUERY 12: For the documents inside the movie collection provide a query that converts the type
+of field genre from a String to an array and moves data into the new attribute.
+
+db.movielens_movies.aggregate(
+  { $project : { genres_array : { $split: ["$genres", "|"] }} }
+);
+
+RESULTS: id of the movies and an array containing all the genres of that movie.
+
+QUERY 13: The movies of Adventure genre.
+
+db.movielens_movies.aggregate([
+  { $project : { title:1, genres_array : { $split: ["$genres", "|"] }}},
+  { $unwind : "$genres_array" },
+  { $match : { "genres_array" : "Adventure"}}
+]);
+
+
+RESULTS: id and title of all adventure movies.
+
+QUERY 14: The movies of Adventure or Action genre.
+
+db.movielens_movies.aggregate([
+  { $project : { title:1, genres_array : { $split: ["$genres", "|"] }}},
+  { $unwind : "$genres_array" },
+  { $match : { $or: [{genres_array : "Adventure"}, {genres_array: "Action"}]}}
+]);
+
+RESULTS: id and title of action and adventure movies.
+
+QUERY 15: The movies of Adventure and Action genre.
+
+db.movielens_movies.aggregate([
+  { $project : { title:1, genres_array : { $split: ["$genres", "|"] }}},
+  { $unwind : "$genres_array" },
+  { $match : { $or: [{genres_array : "Adventure"}, {genres_array: "Action"}]}},
+  { $group : { _id: { "_id" : "$_id" }, count : { "$sum" : 1 } } },
+  { $unwind: "$_id"},
+  { $match: {count:2}},
+  { $project: {_id:1}}
+]);
+
+RESULTS: id of movies with adventure and action genres.
+
+QUERY 16: How many users ranked the movie 589.
+
+db.movielens_users.aggregate([
+  { $unwind : "$movies" },
+  { $match : {"movies.movieid":589}},
+  { $count: "count"}
+]);
+
+RESULTS: 2649
+
+QUERY 17: The names of the users that gave 5 as note to the movie The Untouchables.
+
+db.movielens_users.aggregate([
+  { $unwind : "$movies" },
+  { $match : { $and: [{"movies.movieid": 2194}, {"movies.rating": 5}]}},
+  {$project: {name:1}}
+]);
+
+RESULTS: The names of the users that gave 5 as note to the movie The Untouchables (movie id 2194).
+
+QUERY 18: The query that provides for each user how many movies he evaluated.
+
+db.movielens_users.aggregate({$project: {count: {$size: "$movies"}}})
+
+RESULTS: returns id of user and number of rated movies.
+
+QUERY 19: Provide the query that updates the database and inserts a new attribute in the users documents. This attribute must contain how many movies each user evaluated (you choose the name of the attribute).
+
+db.movielens_users.update(
+     {},
+     [{$set: { EvaluatedMovies : {$size:"$movies" }}}],
+     { multi: true }
+     )
+
+RESULTS: Update of the database with number of evaluated movies.
+
+QUERY 20: The new query that provides for each user how many movies he evaluated.
+
+db.movielens_users.find({},{_id:1,EvaluatedMovies:1})
+
+RESULTS: id of user and number of evaluated movies.
+
